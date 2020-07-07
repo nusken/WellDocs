@@ -8,7 +8,7 @@
   - [Workflow](#workflow)
   - [Coding](#coding)
     - [Import Job](#import-job)
-    - [Crawl/Fetch Job](#crawl/fetch-job)
+    - [Crawl/Fetch Job](#crawlfetch-job)
     - [Valuation Page](#valuation-page)
     - [Map Page](#map-page)
     - [Run R](#run-r)
@@ -274,4 +274,73 @@ quy trình như trên kèm theo
 
 đây là loại job thường thấy nhất trong app, vd client có 1 file CSV/EXCEL và yêu cầu import vào trong database
 
-## các bước làm:
+#### các bước làm:
+
+1. clear requirement với khách hàng, hỏi xem là cột nào sẽ import vào cột nào, thường sẽ có 2 loại cột là identity column và data column ( identity column là cột dùng để xác định/ tìm ra resource cần phải update/import, còn data column là cột chứa data để import vào database)
+
+vd
+
+```csv
+well_name, well_depth
+ABC, 123
+XYZ, 456
+```
+
+trong file csv này có 2 cột là well_name và well_depth, trong đó well_name là identity column, dùng nó để tìm ra well cần update còn well_depth là data column chứa thông tin để import vào database
+
+2. cần xác định job của nước nào và tạo job trong thư mục tương ứng, vd job của `Brazil` thì vào vào folder `app/jobs/brazil` để tạo job mới, lưu ý job mới tạo phải kế thừa từ class `ScraperJobWithShard` , đồng thòi có constant `COUNTRY_NAME`
+
+```ruby
+module Brazil
+  class CreateDuplicateAssetJob < ScraperJobWithShard
+    COUNTRY_NAME = 'Brazil'
+
+    # your code here
+```
+
+3. tiếp theo sẽ implement hàm perform của job này, thường sẽ nhận 1 argument là file_path, đọc nội dung file cần import thành 1 array 2 chiều, sau đó loop qua từng row trong mãng 2 chiều trên và import vào database
+
+4. đễ cho clean code, hầu hết sẽ không import trực tiếp trong job mà sẻ đẩy data vào 1 parser tương thích, vd
+
+```ruby
+rows.each do |row|
+  Rows::Brazil::WellProductionDataParser.new(
+    row,
+    self,
+    country,
+  ).perform
+end
+```
+
+5. trong parser sẽ tiếp tục implement, cần chú ý trong hàm `convert_row_to_attrs`, hàm này sẽ dọc file `attrs_mapping.yml` và các file yaml của các nước, vd: `brazil_attrs_mapping.yml`,`mexico_attrs_mapping.yml`, cần tạo `model_type` tương thích
+
+vd với file csv ở trên thì
+
+```yml
+update_well_depth:
+  main:
+    - well_name
+    - well_depth
+```
+
+hàm `convert_row_to_attrs` sẽ convert mãng 1 chiều row thành 1 hash data
+
+```ruby
+=> attrs
+{
+  well_name: 'ABC',
+  well_depth: 123
+}
+```
+
+sau khi đã có hash data này, sẽ lần lượt đọc thông tin để import, vd tìm well thông qua `attrs[:well_name]`, sau đó update well_depth vào well vừa tìm được
+
+6. sau khi import xong thì check lại và merge vào nhánh `staging`, sau đó deploy lên staging
+7. scp file lên staging, folder `data_files/xxx`, với xxx là số card, sau đó vào rails c và chạy lại job trên staging
+8. check lại và báo khách hàng check
+
+### Crawl/Fetch Job
+
+job này tương tự như import job, nhưng thay vì khách hàng đưa file sẵn thì sẽ kêu crawling từ 1 nguồn nào đó ( khách hàng sẽ đưa link )
+
+mình sẽ tìm cách để từ link đó tải file về, có thể là file excel, csv, pdf hoặc html... mục đích cuối cùng là để convert thành mãng 2 chiều giống job import, sau đó cũng đẩy vào parser để xử lí thông tin vừa scrawl được
