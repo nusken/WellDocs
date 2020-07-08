@@ -344,3 +344,50 @@ sau khi đã có hash data này, sẽ lần lượt đọc thông tin để impo
 job này tương tự như import job, nhưng thay vì khách hàng đưa file sẵn thì sẽ kêu crawling từ 1 nguồn nào đó ( khách hàng sẽ đưa link )
 
 mình sẽ tìm cách để từ link đó tải file về, có thể là file excel, csv, pdf hoặc html... mục đích cuối cùng là để convert thành mãng 2 chiều giống job import, sau đó cũng đẩy vào parser để xử lí thông tin vừa scrawl được
+
+### Valuation Page
+
+- lưu ý, trước khi test cần generate elastichsearch data cho các nước
+
+page này gồm 2 phần chính:
+
+- filter section
+- assets section
+
+#### filter section
+
+filter gồm 2 request chính:
+
+- request `fetch_country_relative_data_overview` để lấy thông tin dropdown element
+- request `assets` để call service để lấy thông tin html và show lên trên screen ( phần assets section )
+
+1. mỗi khi select 1 element bất kì trong khung filter, đều sẽ call `fetch_country_relative_data_overview` để lấy thông tin dropdown mới phù hợp. vd lúc đầu ở mục asset có rất nhiều field/block, nhưng khi filter chọn country là brazil thì khi chọn lại asset chỉ còn lại 1 số field của brazil thôi
+2. đồng thời sẽ call `assets` để lấy thông tin match với filter đang chọn và show lên, vd lúc đầu nếu ko chọn gì thì sẽ có 1000 assets, khi chọn country brazil thì sẽ chỉ còn show
+   `Assets 200 Assets Found`
+3. Filter bao gồm cả pagination và sortBy
+
+#### Asset section
+
+khi FE call `assets` thì BE sẽ query trong elastichsearch để tìm ra những asset phù hợp thông qua service `Customer::AssetOverview::SearchAssetsService`, service này sẽ trả về thông tin số asset phù hợp với điều kiện filter
+
+Sau đó ta sẽ đẩy data này vào `Customer::AssetOverview::AssetFacade` để render html cho clean và chính xác, tầng view chỉ việc gọi những hàm đã implement trong class AssetFacade, còn việc implement như thế nào thì chi tiết sẽ vào trong hàm của class đó => tách biệt logic và view
+
+Ngoài ra ta còn dùng cache Redis
+
+```ruby
+- facades.each do |facade|
+  = generate_asset(facade)
+```
+
+```ruby
+def generate_asset(facade)
+  Rails.cache.fetch(facade.cache_key) { render partial: 'customer/assets/asset', locals: { facade: facade } }
+end
+```
+
+#### Notes
+
+1. generate elastichsearch trong job `Cache::GenerateElasticsearchDataJob`
+2. xem thông tin hàm `to_hash` trong model field và block để biết được sẽ đẩy thông tin gì vào elastichsearch
+3. xem `AssetRepository` để biết cách mapping elastichsearch
+4. xem `Assets::ElasticsearchService` để biết câu query elastichsearch ntn
