@@ -391,3 +391,124 @@ end
 2. xem thông tin hàm `to_hash` trong model field và block để biết được sẽ đẩy thông tin gì vào elastichsearch
 3. xem `AssetRepository` để biết cách mapping elastichsearch
 4. xem `Assets::ElasticsearchService` để biết câu query elastichsearch ntn
+
+## Map Page
+
+kiến thức để làm phần này:
+
+- ruby
+- javascript es6
+- filter with ES
+- 1 số kiến thức về ReactJS
+
+page này gồm các phần chính:
+
+- backend `Maps::BuildJsonService`
+- frontend filter, vẽ map và các action với map
+
+### Backend
+
+mục tiêu là query thông tin database ra thành 1 file json trả về cho FE để show, nhưng trong quá trình làm việc thì có 1 số issue ( thời gian query và generate ra file json chậm, issue cache, code smell) nên solution là thay vì mỗi lần query và trả về data cho FE xử lí thì hầu hết việc xử lí đều ở backend, sau đó sẽ ghi vào 1 file json và up lên s3, mỗi khi FE request thì sẽ lấy url của file json cache map này và cho FE tải về
+
+chú ý:
+
+- file json này sẽ đã được add vào cronjob mỗi ngày generate 1 lần
+- mỗi lần đưa trả đường link đều có token riêng nên sẽ không bị vấn đề browser cache
+- nếu có vấn đề về tốc độ sau này thì nên dùng cdn hoặc biện pháp khác để giúp khách hàng tải file này về nhanh hơn ( hiện bucket đang ở west-2 oregon, nên suy nghĩ sau này sẽ scale ra các region khác)
+
+luồng chạy:
+
+Customer::MapsController#search -> Maps::BuildJsonService -> handlers -> facades
+
+Maps::BuildJsonService -> service sẽ giúp gọi những handler tương ứng cho từng layer, nếu có nhu cầu thêm/bớt layer thì nên xử lí trong này
+handlers -> mỗi layer đều có handler riêng ( FieldHandler, BlockHandler, WellHandler ), tuỳ vào mỗi nước mà sẽ có điều kiện để query ra các resource này khác nhau
+
+vd: với nước bahamas thì có điều kiện query khác và includes khác nhau
+
+```ruby
+def find_well
+  if country.id == BAHAMAS_ID
+    Well.where(country: country)
+        .with_coordinate
+        .select(ATTRIBUTES_FOR_THE_MAP)
+  else
+    Well.where(country: country)
+        .where.not(name: DISABLED_WELL)
+        .with_coordinate
+        .includes(field: :basin, well_block: :basin, block: :basin)
+        .select(ATTRIBUTES_FOR_THE_MAP)
+  end
+end
+```
+
+facades -> sau khi đã query được resource với những điều kiện tương ứng thì sẽ đẩy record đó vào trong facade layer để render json cho phù hợp, tầng này sẽ hỗ trợ xử lí thông tin để FE có thể render dễ dàng nhất
+
+```ruby
+def to_json(*_args)
+  {
+    name: name_anp,
+    field_name: field_name,
+    well_type: well_type,
+  ...
+  }
+end
+
+def well_type
+  well.cached_map_data['map_data'] && well.cached_map_data['map_data']['well_type']
+end
+```
+
+sau khi ruby đã generate ra được 1 object data chứa các layer ( trong class `Maps::BuildJsonService` ) thì sẽ ghi ra file json và up lên s3 bucket ( đọc `Maps::CachingService` ), khi FE request thì sẽ lấy link của file json này đưa cho FE tải về
+
+### Frontend
+
+FE trên map gồm các phần chính:
+
+- request BE để lấy thông tin filter cho đúng
+- request BE để lấy link file json ở trên
+- sau khi đã lấy file json ở trên thì vẽ map dựa vào data trong file json
+- sau khi đã vẽ map và các layer, user có thể filter và select 1 số field/block/facility
+
+#### Request BE để lấy thông tin filter cho đúng
+
+xem file `app/assets/javascripts/index.js`
+
+```
+GoogleMap.loadCountryRelativeData(value, { on_map: true });
+```
+
+#### request BE để lấy link file json ở trên
+
+```js
+function reRenderMaps(options)
+```
+
+#### Vẽ map với thông tin vừa nhận
+
+```js
+GoogleMap.initCircleMap(data, clearMarkers)
+```
+
+file này viết bằng Reactjs
+
+#### user có thể filter và select
+
+user filter data trong FE, vd chọn company nào đó => chỉ hiện những data liên quan đến company đó
+
+```
+app/javascript/components/Maps/MapScripts/filterMaps.js
+```
+
+user khi click vào 1 asset ( block/field ) sẽ zoom vào asset đó
+
+```
+app/javascript/components/Maps/MapScripts/mapHelpers/focusMap.js
+```
+
+đồng thời sẽ hiện popup thông tin của object đó
+
+```
+app/javascript/components/Maps/MapScripts/infoWindows/index.js
+```
+
+ngoài ra còn 1 số tính năng khác như vẽ chart cho facility ( `app/javascript/components/Maps/MapScripts/mapHelpers/drawChart.js` ), chọn field nhưng zoom vào block ...
