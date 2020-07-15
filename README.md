@@ -512,3 +512,67 @@ app/javascript/components/Maps/MapScripts/infoWindows/index.js
 ```
 
 ngoài ra còn 1 số tính năng khác như vẽ chart cho facility ( `app/javascript/components/Maps/MapScripts/mapHelpers/drawChart.js` ), chọn field nhưng zoom vào block ...
+
+## Run R
+
+đầu tiên cần clone code của các repo ML về các folder nước tương thich
+
+vd:
+
+- https://github.com/welligence/BrazilML -> brazil
+- https://github.com/welligence/ArgML -> argentina
+
+Install R với version `3.4.3` cho giống với môi trường staging
+tạo file dump country level cho nước cần chạy
+
+```ruby
+DumpDataJob.perform_now('Brazil') # generate cho nước Brazil
+```
+
+sau khi dump xong, kiểm tra trong folder `/dump_data/brazil` xem có file dump chưa
+
+```s
+➜ ls -l dump_data/brazil
+total 731416
+-rw-rw-r-- 1 ubuntu ubuntu 114023183 Jul 15 00:19 Brazil_data.rds
+-rw-rw-r-- 1 ubuntu ubuntu    145776 Jul 15 00:17 gas_prices.csv
+-rw-rw-r-- 1 ubuntu ubuntu   2539984 Jul 15 00:17 gas_statistics.csv
+-rw-rw-r-- 1 ubuntu ubuntu   5071437 Jul 15 00:16 hist_field_prod.csv
+-rw-rw-r-- 1 ubuntu ubuntu    841216 Jul 15 00:17 inputs.csv
+-rw-rw-r-- 1 ubuntu ubuntu    163902 Jul 15 00:17 oil_prices.csv
+-rw-rw-r-- 1 ubuntu ubuntu 408757342 Jul 15 00:15 production_data.csv
+-rw-rw-r-- 1 ubuntu ubuntu     84410 Jul 15 00:17 schedule_inputs.csv
+-rw-rw-r-- 1 ubuntu ubuntu     30598 Jul 15 00:16 sim_assets.csv
+-rw-rw-r-- 1 ubuntu ubuntu   3961054 Jul 15 00:15 well_data.csv
+-rw-rw-r-- 1 ubuntu ubuntu 212168973 Jul 15 00:20 well_injection_data.csv
+-rw-rw-r-- 1 ubuntu ubuntu   1136331 Jul 15 00:15 well_type.csv
+```
+
+tiến hành chạy R1, R2
+
+```ruby
+GeneratePredictionsFieldJob.perform_now('Brazil', 14, false) #run R1
+GenerateR2OutputsFieldJob.perform_now('Brazil', 14, false) #run R2
+```
+
+_flow run R gồm các step_:
+
+- symlink dump data file vào folder data process của asset đó
+- generate dump file asset level
+- chạy R script tương ứng ( R1, R2, Rfinal, ... trong bước này gồm các bước nhỏ như: copy r code về data processor, chạy rscript, nếu có error gì thì ghi ra log file )
+- kiểm tra xem có error không bằng cách xem log ( xem trong `RCommon`, `R1ScriptService`, ... )
+- nếu có error thì update r_status là failed
+- nếu không có error thì bắt đầu bước parse data output của R1/R2/R final
+- trong bước parse data sẽ kiểm tra có đủ file output không, nếu không có đủ sẽ báo missing và error
+- import file output vào trong db để xử lí sau này
+
+```ruby
+  def parse_r_output
+    OutputCsv::PredictionService.new(data_processor).perform
+  end
+```
+
+note:
+
+- có thể output của R1 là input của R2
+- có thể output của R2 chính là input của R1 lần tiếp theo chạy
