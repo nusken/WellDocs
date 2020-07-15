@@ -576,3 +576,147 @@ note:
 
 - có thể output của R1 là input của R2
 - có thể output của R2 chính là input của R1 lần tiếp theo chạy
+
+## Generate Excel Report
+
+### Flow generate excel report
+
+sau khi đã chạy đc R1, R2, Rfinal... đủ điều kiện và data thì ta có thể dùng data đó để generate ra file excel asset model
+
+```ruby
+GenerateReportFieldJob
+GenerateReportBlockJob
+```
+
+original asset là asset được tạo thông qua quá trình import shapefile, excel, những asset này đã đủ điều kiện để có production.
+new asset là những asset mới, chưa bắt đầu sản xuất được
+mỗi loại lại có các kiểu `fiscal_regime` khác nhau, phổ biến là `Concession` và `PSC`
+
+vd với nước Brazil thì có 4 loại tương ứng với 4 loại template
+
+- original asset Concession
+- original asset Psc
+- new asset Concession
+- new asset Psc
+
+sau khi đã biết được asset loại nào thì ta cần tìm generator tương ứng với asset đó
+
+```ruby
+def generator
+  country_name = field.country.name.split(' ').first.titleize
+  begin
+    "Report::#{country_name}::Excel::#{field.field_template_type}::#{field.fiscal_regime_type}::Generator".constantize
+  rescue StandardError => _e
+    # TODO: Implement other country to match above pattern
+    case country_name
+    when 'Suriname'
+      "Report::#{country_name}::Excel::#{field.fiscal_regime_type}::Generator".constantize
+    when 'Argentina'
+      Report::Generator
+    else
+      "Report::#{country_name}::ManageGenerator".constantize
+    end
+  end
+end
+
+
+=> generator.new(field, self).perform
+```
+
+mỗi file report excel sẽ có nhiều sheet ( Cover, Asset Overview, Asset Detail,...) nên ta cũng chia ra thành nhiều class component, mỗi class đảm nhận 1 sheet gọi là `sheet_modifiers`
+
+cấu trúc folder của 1 loại report
+
+```s
+├── generator.rb
+├── sheet_modifiers
+│   ├── asset_detail.rb
+│   ├── asset_overview.rb
+│   ├── base_modifier.rb
+│   ├── cash_flows.rb
+│   ├── charts.rb
+│   ├── comps.rb
+│   ├── cover.rb
+│   ├── depreciation.rb
+│   ├── hist_drilling.rb
+│   ├── inputs.rb
+│   ├── reserves.rb
+│   ├── revenue.rb
+│   ├── total_prod.rb
+│   ├── type_curve.rb
+│   └── well_by_well.rb
+└── sheet_modifiers.rb
+```
+
+vd muốn update cho sheet `Input` thì ta vào trong file `sheet_modifiers/inputs.rb` để update code
+
+việc sẽ xử lí sheet nào dựa vào hàm perform của generator đó
+
+```ruby
+MODIFIERS = %w[
+  Cover
+  AssetOverview
+  AssetDetail
+  Charts
+  Inputs
+  WellByWell
+  TypeCurve
+  Revenue
+  Reserves
+  Depreciation
+  TotalProd
+  CashFlows
+  HistDrilling
+  Comps
+].freeze
+
+def perform
+  prefix = Report::Brazil::Excel::OriginalAsset::Concession::SheetModifiers
+  MODIFIERS.each do |sheet_name|
+    sheet = workbook[SHEETS[sheet_name.underscore.to_sym]]
+
+    "#{prefix}::#{sheet_name}".constantize.new(field, sheet).perform
+  end
+end
+```
+
+vd sau này cần phải thêm sheet Abc thi ta sẽ:
+
+- tạo file `abc.rb` trong folder `sheet_modifiers` và implement phần insert dữ liệu
+- thêm `Abc` vào trong `MODIFIERS`
+- kiểm tra trong `SHEETS` đã có sheet tên `Abc` chưa...
+
+Notes: cần kiểm tra đã có sẵn file template tương ứng với loại asset đang generate chưa, thường sẽ đặt trong folder `asset-model-templates`
+
+```ruby
+def excel_template
+  file_path = 'asset-model-templates/brazil/'
+  file_path += asset_type.titleize.parameterize
+  file_path +=
+    if field.name == 'SUL DE SAPINHOA'
+      '-concession'
+    else
+      case field_type
+      when 'Concession' then '-concession'
+      when 'Transfer of Rights' then '-tor'
+      when 'Production Sharing Contract' then '-psc'
+      else '-concession'
+      end
+    end
+
+  template = Rails.root.join("#{file_path}.xlsx")
+  raise Exceptions::AssetModelTemplateNotExists unless template.exist?
+
+  template
+end
+```
+
+### Implement cho từng sheet_modifiers
+
+dùng thư viện `rubyxl` để đọc và tương tác với các file excel
+
+Notes:
+
+- hầu hết các hàm đã được implement trong các module Reportable, BlockReportable, Report::Utilable, ...
+- sau này khi có 1 hàm nào cần implement thì nên move vào các module, vd cho `AssetOverview` => `Brazil::AssetOverviewable`, nếu có nhiều nước xài thì move hàm đó vào cái chung vd `AssetOverviewable`
+- tham khảo code từ những sheet cũ đã implement và follow theo style code
