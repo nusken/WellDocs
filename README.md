@@ -13,7 +13,7 @@
     - [Map Page](#map-page)
     - [Run R](#run-r)
     - [Generate Excel Report](#generate-excel-report)
-    - [Generate Enhanced Report](#generate-enhanced-report)
+    - [Generate Enhanced Report PDF](#generate-enhanced-report-pdf)
     - [Cron Job](#cron-job)
   - [Server Config](#server-config)
     - [ML code](#ml-code)
@@ -720,3 +720,119 @@ Notes:
 - hầu hết các hàm đã được implement trong các module Reportable, BlockReportable, Report::Utilable, ...
 - sau này khi có 1 hàm nào cần implement thì nên move vào các module, vd cho `AssetOverview` => `Brazil::AssetOverviewable`, nếu có nhiều nước xài thì move hàm đó vào cái chung vd `AssetOverviewable`
 - tham khảo code từ những sheet cũ đã implement và follow theo style code
+
+## Generate Enhanced Report PDF
+
+đầu tiên, gọi là enhanced report bởi vì trước đó đã có 1 bản pdf report, nhưng bản đó chỉ là version đơn giản, ít thông tin. Sau này khách hàng có nhu cầu nâng cấp report lên 1 phiên bản nhiều thông tin hơn nên sinh ra enhanced report
+
+phần này gồm 2 step:
+
+- generate ra enhanced excel report ( 1 file excel )
+- dựa vào file excel vừa được generate để generate ra bản report pdf
+
+check file `GenerateEnhancedReportFieldJob`
+
+```ruby
+def generator
+  country_name = field.country.name.split(' ').first.titleize
+  begin
+    "Report::#{country_name}::EnhancedExcel::#{field.field_template_type}::#{field.fiscal_regime_type}::Generator".constantize
+  rescue StandardError => _e
+    case country_name
+    when 'Peru'
+      'Report::Peru::EnhancedExcel::Generator'.constantize
+    when 'Suriname'
+      "Report::#{country_name}::EnhancedExcel::#{field.fiscal_regime_type}::Generator".constantize
+    else
+      "Report::#{country_name}::EnhancedExcel::Generator".constantize
+    end
+  end
+end
+```
+
+### Generate enhanced excel report
+
+flow: upload excel report to `M$ Sharepoint` -> pull data -> generate enhanced excel report -> upload to `S3`
+
+dựa vào những thông tin từ R/Scrape data/Manual input hoặc từ Excel Report mà ta sẽ import thông tin vào file template excel , xem trong folder `enhanced_template`, hầu hết các nước đều dùng default `template.xlsx`, với ARG, GOM thì có custom lại nên dùng template khác ( client up lên trello )
+
+```s
+enhanced_template
+├── argentina_template.xlsx
+├── bolivia_template.xlsx
+├── gom_template.xlsx
+└── template.xlsx
+```
+
+tập trung vào file `Generator` của các nước trong module `EnhancedReport`
+
+```ruby
+module Report
+  module Brazil
+    module EnhancedExcel
+      module OriginalAsset
+        class Concession::Generator < Generator
+```
+
+cấu trúc sourcecode cũng tương tự bên module `Report`
+
+```s
+├── generator.rb
+└── sheet_modifiers
+    ├── base_modifier.rb
+    ├── costs.rb
+    ├── development.rb
+    ├── facilities.rb
+    ├── financials.rb
+    ├── production.rb
+    ├── project_high.rb
+    └── reserves.rb
+```
+
+module `Report::Template` là phần dùng chung của tất cả các `EnhancedReport::Generator`, module này rất quan trọng trong step này, nên xem kĩ các bước của nó
+
+Lưu ý: module này có sử dụng multi thread để tăng tốc độ upload/pull data từ `M$ Sharepoint`, cần xem máy mình có chịu nổi ko =))), nên set từ 4-8 thread là hợp lý, ở trên staging thì cứ set 1-2 thread là ok rồi
+
+### Generate enhanced pdf report
+
+flow: upload enhanced excel report -> tổng hợp data theo từng sheet -> generate ra file html -> convert html to pdf bằng gem `WickedPDF`
+
+dựa vào thông tin của enhanced excel, chart trong đó mà ta sẽ generate ra file html đầy đủ thông tin và biểu đồ cho khách hàng hơn
+
+chú ý module `Report::EnhancedPdfable`
+
+file enhanced report template `layouts/enhanced_pdf.haml`
+
+```s
+├── generator.rb
+└── sheet_pullers
+    ├── analytics.rb
+    ├── asset_overview.rb
+    ├── base_puller.rb
+    ├── costs.rb
+    ├── development.rb
+    ├── facilities.rb
+    ├── facility_production.rb
+    ├── financials.rb
+    ├── map.rb
+    ├── ownership.rb
+    ├── production.rb
+    ├── project_high.rb
+    ├── reserves.rb
+    ├── risk_opp.rb
+    └── start.rb
+```
+
+cấu trúc thư mục và class cũng tương tự như module `report` và `enhanced report`, cũng chia ra thành các tab
+
+```ruby
+module Report
+  module Brazil
+    module EnhancedPdf
+      module OriginalAsset
+        module Concession
+          class Generator
+            include Report::EnhancedPdfable
+```
+
+Lưu ý: module này có sử dụng multi thread để tăng tốc độ upload/pull data từ `M$ Sharepoint`, cần xem máy mình có chịu nổi ko =))), nên set từ 4-8 thread là hợp lý, ở trên staging thì cứ set 1-2 thread là ok rồi
