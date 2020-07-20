@@ -847,3 +847,58 @@ Lưu ý:
 
 - Cái nào chạy lâu thì bỏ vào job
 - Cái nào job nên chạy cố định vào một thời điểm thì xài cronjob => whenever
+
+## Server Config
+
+### ML code
+
+- setup trên server staging, production tương tự như ở dưới local, sẽ đặt code R trong thư mục `machine_learning`
+- khi clone code về thì đặt tên lại folder thành tên nước ( BrazilMl -> brazil, MexML -> mexico)
+- folder `WellML` là folder chứa code package của dự án do chính team DS của welligence xây dựng lên, có thể cài đặt bằng 2 cách là :
+
+* Run file `runme_server.R`
+* Rscript -e "devtools::install_github('sethneel/WellML', auth_token = '$AUTH_TOKEN', upgrade = 'never', force = TRUE, ref = '$WELLML_BRANCH')"
+
+### Backup Database
+
+Welligence sử dụng dịch vụ RDS của AWS, mỗi ngày sẽ tự snapshot lại, limit là 7 ngày
+
+Ngoài ra để giúp dev có thể có bản backup thì còn có sử dụng gem `backup` để dev có thể chọn database nước nào cần để backup ( xem `BackupWorker` )
+
+Gem `backup` được config trong folder `/home/ubuntu/Backup`
+
+```s
+├── angola_backup.rb
+├── argentina_backup.rb
+├── bahamas_backup.rb
+├── barbados_backup.rb
+├── bolivia_backup.rb
+├── brazil_backup.rb
+├── chile_backup.rb
+├── colombia_backup.rb
+├── cuba_backup.rb
+├── dominican_republic_backup.rb
+├── ecuador_backup.rb
+├── falkland_islands_islas_malvinas_backup.rb
+├── french_guiana_backup.rb
+├── ghana_backup.rb
+├── gom_backup.rb
+├── guyana_backup.rb
+├── honduras_backup.rb
+├── jamaica_backup.rb
+├── master_backup.rb
+├── mexico_backup.rb
+├── nicaragua_backup.rb
+├── nigeria_backup.rb
+├── peru_backup.rb
+├── production_backup.rb
+├── suriname_backup.rb
+├── trinidad_and_tobago_backup.rb
+├── uruguay_backup.rb
+└── venezuela_backup.rb
+```
+
+khi dev vào trang `https://staging.welligence.com/admin/countries`, chọn nước và bấm backup => tạo job `BackupWorker` cho nước đó và run script backup, sau khi backup thành công sẽ up lên s3 và gửi mail backup success
+
+Note:
+các job backup sau này cũng hoạt động tương tự, chỉ thay `bucket name` và `limit`
