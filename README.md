@@ -392,7 +392,7 @@ end
 3. xem `AssetRepository` để biết cách mapping elastichsearch
 4. xem `Assets::ElasticsearchService` để biết câu query elastichsearch ntn
 
-## Map Page
+### Map Page
 
 kiến thức để làm phần này:
 
@@ -406,7 +406,7 @@ page này gồm các phần chính:
 - backend `Maps::BuildJsonService`
 - frontend filter, vẽ map và các action với map
 
-### Backend
+#### Backend
 
 mục tiêu là query thông tin database ra thành 1 file json trả về cho FE để show, nhưng trong quá trình làm việc thì có 1 số issue ( thời gian query và generate ra file json chậm, issue cache, code smell) nên solution là thay vì mỗi lần query và trả về data cho FE xử lí thì hầu hết việc xử lí đều ở backend, sau đó sẽ ghi vào 1 file json và up lên s3, mỗi khi FE request thì sẽ lấy url của file json cache map này và cho FE tải về
 
@@ -460,7 +460,7 @@ end
 
 sau khi ruby đã generate ra được 1 object data chứa các layer ( trong class `Maps::BuildJsonService` ) thì sẽ ghi ra file json và up lên s3 bucket ( đọc `Maps::CachingService` ), khi FE request thì sẽ lấy link của file json này đưa cho FE tải về
 
-### Frontend
+#### Frontend
 
 FE trên map gồm các phần chính:
 
@@ -469,7 +469,7 @@ FE trên map gồm các phần chính:
 - sau khi đã lấy file json ở trên thì vẽ map dựa vào data trong file json
 - sau khi đã vẽ map và các layer, user có thể filter và select 1 số field/block/facility
 
-#### Request BE để lấy thông tin filter cho đúng
+##### Request BE để lấy thông tin filter cho đúng
 
 xem file `app/assets/javascripts/index.js`
 
@@ -477,13 +477,13 @@ xem file `app/assets/javascripts/index.js`
 GoogleMap.loadCountryRelativeData(value, { on_map: true });
 ```
 
-#### request BE để lấy link file json ở trên
+##### request BE để lấy link file json ở trên
 
 ```js
 function reRenderMaps(options)
 ```
 
-#### Vẽ map với thông tin vừa nhận
+##### Vẽ map với thông tin vừa nhận
 
 ```js
 GoogleMap.initCircleMap(data, clearMarkers)
@@ -491,7 +491,7 @@ GoogleMap.initCircleMap(data, clearMarkers)
 
 file này viết bằng Reactjs
 
-#### user có thể filter và select
+##### user có thể filter và select
 
 user filter data trong FE, vd chọn company nào đó => chỉ hiện những data liên quan đến company đó
 
@@ -513,7 +513,7 @@ app/javascript/components/Maps/MapScripts/infoWindows/index.js
 
 ngoài ra còn 1 số tính năng khác như vẽ chart cho facility ( `app/javascript/components/Maps/MapScripts/mapHelpers/drawChart.js` ), chọn field nhưng zoom vào block ...
 
-## Run R
+### Run R
 
 đầu tiên cần clone code của các repo ML về các folder nước tương thich
 
@@ -577,9 +577,9 @@ note:
 - có thể output của R1 là input của R2
 - có thể output của R2 chính là input của R1 lần tiếp theo chạy
 
-## Generate Excel Report
+### Generate Excel Report
 
-### Flow generate excel report
+#### Flow generate excel report
 
 sau khi đã chạy đc R1, R2, Rfinal... đủ điều kiện và data thì ta có thể dùng data đó để generate ra file excel asset model
 
@@ -711,7 +711,7 @@ def excel_template
 end
 ```
 
-### Implement cho từng sheet_modifiers
+#### Implement cho từng sheet_modifiers
 
 dùng thư viện `rubyxl` để đọc và tương tác với các file excel
 
@@ -721,7 +721,7 @@ Notes:
 - sau này khi có 1 hàm nào cần implement thì nên move vào các module, vd cho `AssetOverview` => `Brazil::AssetOverviewable`, nếu có nhiều nước xài thì move hàm đó vào cái chung vd `AssetOverviewable`
 - tham khảo code từ những sheet cũ đã implement và follow theo style code
 
-## Generate Enhanced Report PDF
+### Generate Enhanced Report PDF
 
 đầu tiên, gọi là enhanced report bởi vì trước đó đã có 1 bản pdf report, nhưng bản đó chỉ là version đơn giản, ít thông tin. Sau này khách hàng có nhu cầu nâng cấp report lên 1 phiên bản nhiều thông tin hơn nên sinh ra enhanced report
 
@@ -750,7 +750,7 @@ def generator
 end
 ```
 
-### Generate enhanced excel report
+#### Generate enhanced excel report
 
 flow: upload excel report to `M$ Sharepoint` -> pull data -> generate enhanced excel report -> upload to `S3`
 
@@ -793,7 +793,7 @@ module `Report::Template` là phần dùng chung của tất cả các `Enhanced
 
 Lưu ý: module này có sử dụng multi thread để tăng tốc độ upload/pull data từ `M$ Sharepoint`, cần xem máy mình có chịu nổi ko =))), nên set từ 4-8 thread là hợp lý, ở trên staging thì cứ set 1-2 thread là ok rồi
 
-### Generate enhanced pdf report
+#### Generate enhanced pdf report
 
 flow: upload enhanced excel report -> tổng hợp data theo từng sheet -> generate ra file html -> convert html to pdf bằng gem `WickedPDF`
 
@@ -837,7 +837,7 @@ module Report
 
 Lưu ý: module này có sử dụng multi thread để tăng tốc độ upload/pull data từ `M$ Sharepoint`, cần xem máy mình có chịu nổi ko =))), nên set từ 4-8 thread là hợp lý, ở trên staging thì cứ set 1-2 thread là ok rồi
 
-## Cron Job
+### Cron Job
 
 Hệ thống sẽ có những job cần được thiết lập để chạy vào 1 số giờ nhất định, vd: Gửi report vào cuối tuần, clear database vào cuối tháng, ... => Cron job
 
