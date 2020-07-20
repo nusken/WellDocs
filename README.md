@@ -27,7 +27,6 @@
   - [Release Step](#release-step)
     - [Major version](#major-version)
     - [Minor version](#minor-version)
-  - [Add New Country](#add-new-country)
 
 # Welligence Documents
 
@@ -928,3 +927,70 @@ trong `README.md` đã bao gồm hướng dẫn để start jenkins cổng 8080
 4. Update excute code nếu cần
 5. Bấm Save
 6. Double check
+
+## WorkerConfig
+
+We have about 30 EC2 instances to serve R code/generate asset model with prefix [brazil_welligence_ml]. Each instance is an app that have a sidekiq worker listen to a redis host which locate in [prefix]\_1 instance (Eg: brazil_welligence_ml_1).
+What we need to do here are: - Update database connection in database.yml - Update bucket name in application.yml - Update Redis host in application.yml - Check out to correct branch of Brazil/Mexico/Peru machine learning repository - Check out to correct branch for main repository
+
+```
+1. **run_r.sh**:
+   - Update main repository branch to `master`, `staging`, or whatever.
+   - Update machine_learning repositories branch (Brazil, Mexico).
+   - Install dependencies for Rails application.
+   - Restart sidekiq for background jobs.
+   - Sync dump data folder for R code from correct server (staging/prelive/live)
+2. **welligence_shutdown.sh**:
+   - Sync data from instances to correct server after R code finish (actually after the instance stop).
+3. **application.yml**:
+   - Store environment variables for Rails application.
+   - We need to change somethings here (Eg: **redis_host**, **s3_bucket_name**)
+4. **database.yml**:
+   - Store database connection information.
+   - We need to change the **host_name** here to correct rds **host_name**.
+```
+
+có 2 cách để update config trên Mls
+
+### Local Config
+
+#### Get dynamic IPs for ML instances the save to ~/.ssh/config
+
+1. Create `~/.ssh/welligence/ec2.d`
+2. Add `Include ~/.ssh/welligence/ec2.d` to the beginning of `~/.ssh/config` file
+3. Run ruby code to get dynamic IPs for ML instances
+
+- install gem `ec2-writer` # if needed
+- Go to rails console and run
+
+```
+require 'ec2/writer'
+Ec2::Writer::Runner.new.write_config(file_name = 'ec2.d', host_prefix = 'brazil_welligence_ml') # You can change to mexico if needed
+```
+
+4. Check file `~/.ssh/welligence/ec2.d` if it has IP config. If not please check config
+
+#### Config to R for a country
+
+1. Start EC2 ML instances with correspond country (Eg: `brazil_welligence_ml_*` for Brazil)
+2. Update all information with `TODO: tag` in:
+
+- config/application.yml: s3_bucket_name, redis_host
+- config/database.yml: host
+- welligence_shutdown.sh: destination_server_ip is `staging_ip` or `live_ip` or `prelive_ip`
+- run_r.sh: repo_branch, brazil_branch, mexico_branch, peru_branch, colombia_branch, argentina_branch and destination_server_ip
+- prepare_server.sh: server_prefix, root_dir (You have to config ssh host for ML instances first - which was defined in above step) ( my is `root_dir="/Users/Ken/Sourcecode/WellStack"`)
+
+3. Stop and Start ML instances ( dont Reboot )
+4. SSH to brazil_welligence_ml_1 and run R for all active fields of country. (how to run is defined before in README).
+
+### Jenkin Config
+
+mặc định là khi chạy job run r trên jenkin sẽ làm các bước sau:
+
+- update file application.yml, database.yml dựa vào input
+- mở Mls, scp những file config này lên
+- tắt và mở lại Mls để trigger chạy những file vừa up lên
+- Run R, Generate Report
+
+đến bước thứ 3 xong là ta đã update được config của Mls
