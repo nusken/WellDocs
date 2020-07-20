@@ -21,8 +21,6 @@
   - [Jenkins](#jenkins)
     - [Run Job](#run-job)
     - [Config Job](#config-job)
-  - [Monitor](#monitor)
-    - [Sidekiq](#sidekiq)
   - [Worker Config](#server-config)
     - [Local config](#local-config)
     - [Jenkin config](#jenkin-config)
@@ -902,3 +900,31 @@ khi dev vào trang `https://staging.welligence.com/admin/countries`, chọn nư�
 
 Note:
 các job backup sau này cũng hoạt động tương tự, chỉ thay `bucket name` và `limit`
+
+## Jenkins
+
+Welligence có config jenkins dùng để cho việc CI/CD
+
+### Run Job
+
+có 1 số job thường xuyên chạy như:
+
+- http://35.155.0.83:8080/job/deploy-branch-to-env -> deploy branch
+- http://35.155.0.83:8080/job/run-r -> run r trên ml
+
+sau khi chọn job cần chạy thì bấm vào `Build with Parameters` và chọn input phù hợp ( vd chọn nước, chọn branch, ...)
+
+### Config Job
+
+script của jenkins nên được backup vào repo này `https://github.com/welligence/WellJenkins`, sau này khi có nhu cầu update gì thì sẽ push code vào repo này, sau đó ssh lên con jenkins và pull code về, giúp cho code CI có thể revertable
+
+trong `README.md` đã bao gồm hướng dẫn để start jenkins cổng 8080
+
+#### Khi có nhu cầu update config job
+
+1. chọn job cần update
+2. click Configure
+3. thêm input hoặc xoá input cũ => Add Parameter
+4. Update excute code nếu cần
+5. Bấm Save
+6. Double check
