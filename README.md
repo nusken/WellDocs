@@ -836,3 +836,14 @@ module Report
 ```
 
 Lưu ý: module này có sử dụng multi thread để tăng tốc độ upload/pull data từ `M$ Sharepoint`, cần xem máy mình có chịu nổi ko =))), nên set từ 4-8 thread là hợp lý, ở trên staging thì cứ set 1-2 thread là ok rồi
+
+## Cron Job
+
+Hệ thống sẽ có những job cần được thiết lập để chạy vào 1 số giờ nhất định, vd: Gửi report vào cuối tuần, clear database vào cuối tháng, ... => Cron job
+
+trong dự án welligence thì sử dụng gem `whenever`
+
+Lưu ý:
+
+- Cái nào chạy lâu thì bỏ vào job
+- Cái nào job nên chạy cố định vào một thời điểm thì xài cronjob => whenever
