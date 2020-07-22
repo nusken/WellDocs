@@ -994,3 +994,28 @@ mặc định là khi chạy job run r trên jenkin sẽ làm các bước sau:
 - Run R, Generate Report
 
 đến bước thứ 3 xong là ta đã update được config của Mls
+
+## Release Step
+
+sẽ có 2 loại release: major và minor. major khi có các update lớn, hoặc qua 1-2 tháng thì nên major release 1 lần. minor release là khi Bussiness team request release/fix bug 1 feature nào đó lên live
+
+vd hiện tại đang có nhánh 2.45.15 trên live
+
+### Major version
+
+client yêu cầu release 1 nước nào đó, hoặc có update lớn ảnh hưởng source code hoặc đã quá nhiều minor version thì nên release major
+
+các step release
+
+- checkout qua nhánh 2.46.0
+- merge các release branch của các nước cần release vào
+- update file `version.html`
+- backup và restore những nước cần release từ staging lên live
+- copy S3 folder của các nước đó
+- scp folder dump và folder data_proccess của các nước đó lên live, lưu ý nên có thể revertable
+- deploy bản 2.46.0 lên live
+- clear cache, generate new data
+- request client check
+- sau khi client đã check và confirm thì từ các nhánh release country ( vd 2.46_bra ), checkout ra nhánh release country mới ( 2.47_bra ), sau đó merge với release master ( 2.46.0 )
+
+### Minor version
