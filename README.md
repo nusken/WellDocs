@@ -27,6 +27,7 @@
   - [Release Step](#release-step)
     - [Major version](#major-version)
     - [Minor version](#minor-version)
+  - [Fix Template](#fix-template)
 
 # Welligence Documents
 
@@ -237,7 +238,7 @@ NOTE: Brenton đang có dự tính chuyển từ dynamic config dựa vào table
 do welligence là 1 app với nhiều country, data đã chia ra thành các database riêng nên gitflow cũng sẽ được chia thành các nhảnh nhỏ
 sẽ gồm các nhánh: master, staging, release, .... trong đó:
 
-- master: là nhánh chứa code đã được test trên staging, live
+- master: là nhánh chứa code đã được test trên live
 - staging: nhánh này là nhánh chứa code của tất cả các branch, dev khi muốn deploy code lên server staging đều merge vào nhánh này và deploy lên staging
 - release/2.46_xxx: đây là các nhánh chứa code release của các nước, vd sau khi làm feature 123 và đã được client check trên staging rồi thì mình sẽ merge code vào nhánh release tương ứng ( vd làm cho nước brazil thì checkout và merge vào nhánh release/2.46_brazil)
 - release/2.45.x: đây là nhánh chứa code release và chạy trên live, khi release mới thì đều checkout từ nhánh đang chạy trên live và tăng thêm 1 minor, đồng thời merge code của nhánh release country + update version.html
@@ -270,6 +271,11 @@ quy trình như trên kèm theo
 ### Import Job
 
 đây là loại job thường thấy nhất trong app, vd client có 1 file CSV/EXCEL và yêu cầu import vào trong database
+
+có 2 loại job with shard:
+
+- nếu đã biết là dùng cho 1 country => ScraperJobWithShard
+- nếu dùng cho nhiều country => ApplicationJobWithShard
 
 #### các bước làm:
 
@@ -1046,3 +1052,17 @@ nếu release chỉ bao gồm code, không có data thì có thể skip bước 
 - copy S3 folder của các nước đó
 - scp folder dump và folder data_proccess của các nước đó lên live, lưu ý nên có thể revertable
 ```
+
+## Fix Template
+
+nãy các step để fix template:
+
+- unzip Ghana\_-_V2.xlsx -d data -> unzip file template ra folder data
+- vào folder data, tìm và xóa externalLink trong mấy file html
+- xóa trong workbook.xml.res va workbook.xml
+- tìm những chỗ liên quan đến cái externalLink mà xóa đi ( ghana bị lỗi do có liên quan đến externallink )
+- zip -r v1.xlsx \* ( đứng trong folder data ) -> zip lại thành file template v1.xlsx
+- move qua máy windows, mở thì thấy có lỗi -> cho windows sửa lỗi và save lại thành v2.xlsx
+- dùng v2 làm template để generate + có bật excelize golang -> fix đc lỗi khi vừa open, nhưng vẫn còn lỗi khi mở tab revenue
+- mở v2 trên mac, save lại thành v3.xlsx
+- dùng v3 để generate ra -> hiện tại ko còn lỗi hiện popup warning nữa, chắc đã fix đc rồi, đã có thể mapping tiếp
