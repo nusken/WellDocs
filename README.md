@@ -28,6 +28,7 @@
     - [Major version](#major-version)
     - [Minor version](#minor-version)
   - [Fix Template](#fix-template)
+  - [Create New Country](#create-new-country)
 
 # Welligence Documents
 
@@ -1089,7 +1090,7 @@ nếu release chỉ bao gồm code, không có data thì có thể skip bước 
 
 ## Fix Template
 
-nãy các step để fix template:
+Các step để fix template có externalLink:
 
 - unzip Ghana\_-_V2.xlsx -d data -> unzip file template ra folder data
 - vào folder data, tìm và xóa externalLink trong mấy file html
@@ -1100,3 +1101,16 @@ nãy các step để fix template:
 - dùng v2 làm template để generate + có bật excelize golang -> fix đc lỗi khi vừa open, nhưng vẫn còn lỗi khi mở tab revenue
 - mở v2 trên mac, save lại thành v3.xlsx
 - dùng v3 để generate ra -> hiện tại ko còn lỗi hiện popup warning nữa, chắc đã fix đc rồi, đã có thể mapping tiếp
+
+## Create New Country
+
+Khi estimate 1 card cho new country cần hỏi cus về structure của country đó sẽ giống với country nào trong database mình.
+
+Các step để làm card này:
+
+1. ssh lên `Staging` và `Live`
+  - connect vào master database -> create 1 record cho country này (Staging và Live phải cùng id), country model đã add `SyncDatabaseJob` vào nên nó sẽ tự sync data sang tất cả các database có trong shard config
+  - create 1 database từ `welligence_sample` template với name là `welligence_[country_name]`
+2. checkout từ master và làm bình thường, trong step này sẽ bao gồm việc config country level (static_country_properties.yml, static_country_dropdown_values.yml, ...)
+3. khi deploy lên `Staging` nhớ connect vào database của country này để add static_country_properties
+`RakeTask::StaticCountryProperties::AddMissingPropertiesJob.perform_now(country_name)`
