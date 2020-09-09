@@ -222,16 +222,50 @@ git clone git@github.com:welligence/ArgMl.git argentina
 Welligence là 1 app multi sharding, gồm:
 
 - 1 shard master, chứa các data chung ( users, user downloads, ...)
-- mỗi nước sẽ có 1 db shard chứa data của riêng nước đó mà thông, vd db `welligence_brazil` chỉ chứa thông tin của riêng Brazil mà thôi, tương tự với `welligence_mexico`, `welligence_colombia`
+- Mỗi nước sẽ có 1 DB shard chứa data của riêng nước đó, vd DB `welligence_brazil` sẽ chứa thông tin chung & riêng Brazil mà thôi, tương tự với `welligence_mexico`, `welligence_colombia`, ...
+- Mình có config 1 shard sample cho welligence_sample database, db này sẽ dùng để làm template khi create new country database
 
-việc config sharding này dựa vào column `db_name` trên table `countries` trên db master
+Dùng gem Octopus để handle việc này, shard config này được thực hiện trong file `shard_configuration.rb`
 
+```ruby
+return if Rails.env.test?
+
+ENABLED_COUNTRY_DBS = [
+  :angola,
+  :argentina,
+  :bahamas,
+  ...
+].freeze
+
+global_conn_config = ActiveRecord::Base.connection_config
+
+if ENV['COUNTRY_CODE']
+  global_conn_config.merge!(database: "welligence_#{ENV['COUNTRY_CODE']}")
+end
+
+begin
+  shards = {
+    my_shards: {
+      'master' => global_conn_config,
+      'sample' => global_conn_config.merge(database: 'welligence_sample'),
+    },
+  }
+
+  ENABLED_COUNTRY_DBS.each do |country_code|
+    shards[:my_shards][country_code] =
+      global_conn_config.merge(database: "welligence_#{country_code}")
+  end
+
+  Octopus.setup do |config|
+    config.environments = [Rails.env]
+    config.shards = shards[:my_shards]
+  end
+rescue ActiveRecord::StatementInvalid => e
+  Raven.capture_exception(e)
+
+  puts e
+end
 ```
-#<Country:0x00007f9c35f6d9d8 id: 1, name: "Brazil", db_name: "welligence_brazil">
-#<Country:0x00007f9c35f6d7a8 id: 3, name: "Mexico", db_name: "welligence_mexico">
-```
-
-NOTE: Brenton đang có dự tính chuyển từ dynamic config dựa vào table `countries` và thay bằng hard config trong file `shard_configuration.rb`. Update lại khi đã đc merge
 
 ## Workflow
 
