@@ -1111,7 +1111,6 @@ Các step để làm card này:
 1. ssh lên `Staging` và `Live`
   - connect vào master database -> create 1 record cho country này (Staging và Live phải cùng id), country model đã add `SyncDatabaseJob` vào nên nó sẽ tự sync data sang tất cả các database có trong shard config
   - create 1 database từ `welligence_sample` template với name là `welligence_[country_name]`
-  - lên admin backend page trên `Staging` để backup database này về local làm
 2. checkout từ master và làm bình thường, trong step này sẽ bao gồm việc config country level (static_country_properties.yml, static_country_dropdown_values.yml, ...)
 Note: khi deploy lên `Staging` nhớ connect vào database của country này để add static_country_properties
 `RakeTask::StaticCountryProperties::AddMissingPropertiesJob.perform_now(country_name)`
